@@ -24,10 +24,13 @@ export default async function handler(req, res) {
     const modelNormalized = (model || 'gpt-4o').toLowerCase().replace(/\./g, '.').replace(/-/g, ' ');
 
     // --- STEP 1: Fetch PAYGO token pricing ---
-    const paygo = await fetchPaygoPricing(model, modelNormalized, region, deployment);
+    const paygo = await fetchPaygoPricing(model, modelNormalized, region);
 
     // --- STEP 2: Fetch PTU (Provisioned Managed) pricing ---
-    const ptu = await fetchPTUPricing(deployment);
+    const ptu = await fetchPTUPricing(deployment, region);
+
+    const totalItems = (paygo.found_items || 0) + (ptu.found_items || 0);
+    const clientRequest = `/api/azure-pricing?model=${encodeURIComponent(model || '')}&region=${encodeURIComponent(region || '')}&deployment=${encodeURIComponent(deployment || '')}`;
 
     const result = {
       success: true,
@@ -38,6 +41,26 @@ export default async function handler(req, res) {
       deployment,
       paygo,
       ptu,
+      strategy_used: paygo.query_strategy || 'no-paygo-match',
+      total_items: totalItems,
+      provenance: {
+        client_request: clientRequest,
+        retail_prices_endpoint: RETAIL_PRICES_ENDPOINT,
+        paygo_query: paygo.query_url || null,
+        ptu_queries: ptu.query_urls || [],
+        response_fields: [
+          'productName',
+          'skuName',
+          'meterName',
+          'armRegionName',
+          'retailPrice',
+          'unitPrice',
+          'unitOfMeasure',
+          'type',
+          'reservationTerm'
+        ],
+        max_pages_per_query: 3
+      },
       raw_sample: []
     };
 
@@ -55,6 +78,10 @@ export default async function handler(req, res) {
 }
 
 // ─── Pagination Helper ────────────────────────────────────────────────────────
+
+const RETAIL_PRICES_ENDPOINT = 'https://prices.azure.com/api/retail/prices';
+const buildRetailPricesUrl = query =>
+  `${RETAIL_PRICES_ENDPOINT}?$filter=${encodeURIComponent(query)}&$top=100`;
 
 async function fetchAllPages(initialUrl, maxPages = 3) {
   let allItems = [];
@@ -77,7 +104,7 @@ async function fetchAllPages(initialUrl, maxPages = 3) {
 
 // ─── PAYGO Token Pricing ────────────────────────────────────────────────────────
 
-async function fetchPaygoPricing(model, modelNormalized, region, deployment) {
+async function fetchPaygoPricing(model, modelNormalized, region) {
   // Build model-specific search terms
   // The Azure API uses product names like "Azure OpenAI GPT5", "Azure OpenAI"
   // and meter names like "GPT 5.2 chat inp Gl 1M Tokens", "gpt 4o 0513 Input Data Zone Tokens"
@@ -101,12 +128,17 @@ async function fetchPaygoPricing(model, modelNormalized, region, deployment) {
     : queries;
 
   let allItems = [];
+  let matchedQuery = null;
+  let matchedQueryUrl = null;
 
   for (const query of queryVariants) {
     try {
-      const items = await fetchAllPages(`https://prices.azure.com/api/retail/prices?$filter=${encodeURIComponent(query)}&$top=100`);
+      const queryUrl = buildRetailPricesUrl(query);
+      const items = await fetchAllPages(queryUrl);
       if (items.length > 0) {
         allItems = items;
+        matchedQuery = query;
+        matchedQueryUrl = queryUrl;
         break;
       }
     } catch (e) {
@@ -116,11 +148,23 @@ async function fetchPaygoPricing(model, modelNormalized, region, deployment) {
 
   if (allItems.length === 0) {
     console.log('No PAYGO items found for', model);
-    return { input: 0, output: 0, found_items: 0 };
+    return {
+      input: 0,
+      output: 0,
+      found_items: 0,
+      query_url: null,
+      query_strategy: 'no-paygo-match'
+    };
   }
 
   // Parse items to find Global Standard input/output per 1M tokens (non-batch, non-cached)
-  return parsePaygoItems(allItems, model, modelNormalized);
+  return {
+    ...parsePaygoItems(allItems, model),
+    query_url: matchedQueryUrl,
+    query_strategy: regionFilter && matchedQuery?.includes(regionFilter)
+      ? 'model-or-family-with-region'
+      : 'model-or-family-without-region'
+  };
 }
 
 function buildModelSearchTerms(model) {
@@ -183,7 +227,7 @@ function getModelFamily(model) {
   return 'OpenAI';
 }
 
-function parsePaygoItems(items, model, modelNormalized) {
+export function parsePaygoItems(items, model) {
   // We want: Global Standard, per 1M tokens, non-batch, non-cached
   // Input patterns: "inp", "input", "inpt", "prompt"
   // Output patterns: "opt", "outpt", "output", "completion"
@@ -234,10 +278,10 @@ function parsePaygoItems(items, model, modelNormalized) {
     } else if (isOutput && isGlobal) {
       outputCandidates.push({ price: pricePerMillion, meter: item.meterName, unit });
     } else if (isInput) {
-      const depType = /data.?zone/i.test(meter + ' ' + sku) ? 'dataZone' : 'regional';
+      const depType = /\b(dz|dzn|dzone)\b|data.?zone/i.test(meter + ' ' + sku) ? 'dataZone' : 'regional';
       inputCandidates.push({ price: pricePerMillion, meter: item.meterName, unit, nonGlobal: true, deploymentType: depType });
     } else if (isOutput) {
-      const depType = /data.?zone/i.test(meter + ' ' + sku) ? 'dataZone' : 'regional';
+      const depType = /\b(dz|dzn|dzone)\b|data.?zone/i.test(meter + ' ' + sku) ? 'dataZone' : 'regional';
       outputCandidates.push({ price: pricePerMillion, meter: item.meterName, unit, nonGlobal: true, deploymentType: depType });
     }
   }
@@ -276,46 +320,91 @@ function parsePaygoItems(items, model, modelNormalized) {
   };
 }
 
-function isModelMatch(meter, sku, product, model) {
+export function isModelMatch(meter, sku, product, model) {
   const m = model.toLowerCase();
   const combined = `${meter} ${sku} ${product}`.toLowerCase();
+  const meterAndSku = `${meter} ${sku}`.toLowerCase();
+  const compactCombined = combined.replace(/[^a-z0-9.]/g, '');
+  const compactMeterAndSku = meterAndSku.replace(/[^a-z0-9.]/g, '');
 
-  // Build variations of the model name
   const variants = [
-    m,                          // gpt-5.2
-    m.replace(/-/g, ' '),       // gpt 5.2
-    m.replace(/-/g, ''),        // gpt5.2
-    m.replace(/\./g, ''),       // gpt-52
-    m.replace(/-/g, ' ').replace(/\./g, ' '), // gpt 5 2
+    m,
+    m.replace(/-/g, ' '),
+    m.replace(/-/g, ''),
+    m.replace(/\./g, ''),
+    m.replace(/-/g, ' ').replace(/\./g, ' '),
   ];
 
-  // Special handling for non-dotted models
+  let matches = variants.some(variant => combined.includes(variant));
   if (m === 'gpt-5') {
-    // Must match "gpt 5 " or "gpt-5 " or "gpt 5\b" but NOT "gpt 5." (which is 5.1/5.2)
-    return /\bgpt[\s-]5\b(?![\.\d])/i.test(combined) && !combined.includes('5.');
+    matches = /\bgpt[\s-]?5\b(?![.\d])/i.test(combined) && !meterAndSku.includes('5.');
+  } else {
+    const gptVersionMatch = m.match(/^gpt-(4o|[45](?:\.\d+)?)(?:-(.+))?$/);
+    if (gptVersionMatch) {
+      const [, version] = gptVersionMatch;
+      const compactVersion = version.replace('.', '');
+      const familyPresent = compactCombined.includes(`gpt${version[0]}`);
+      const versionPresent = compactMeterAndSku.includes(version)
+        || compactMeterAndSku.includes(`gpt${version}`)
+        || compactMeterAndSku.includes(`gpt${compactVersion}`);
+      matches = familyPresent && versionPresent;
+    }
   }
 
-  return variants.some(v => combined.includes(v));
+  const modifiers = ['mini', 'nano', 'pro', 'codex', 'sol', 'terra', 'luna'];
+  for (const modifier of modifiers) {
+    const modelRequiresModifier = m.includes(`-${modifier}`);
+    const meterHasModifier = new RegExp(`\\b${modifier}\\b`, 'i').test(meterAndSku);
+    if (modelRequiresModifier !== meterHasModifier) return false;
+  }
+
+  if (!m.includes('-pro') && /\b(longco|pp)\b/i.test(meterAndSku)) return false;
+  if (!m.endsWith('-mini') && /\bmini\b/i.test(meterAndSku)) return false;
+
+  return matches;
 }
 
 // ─── PTU (Provisioned Managed) Pricing ──────────────────────────────────────────
 
-async function fetchPTUPricing(deployment) {
+async function fetchPTUPricing(deployment, region) {
   // PTU pricing is uniform across all models — query for "Provisioned Managed" meters
   // Also fetch from the reservation product for monthly/yearly reservation rates
-  const queries = [
+  const baseQueries = [
     `contains(productName, 'OpenAI') and contains(meterName, 'Provisioned Managed')`,
     `contains(productName, 'Foundry Provisioned Throughput Reservation') and contains(meterName, 'Provisioned Managed')`
   ];
 
   let allItems = [];
+  let usedQueries = [];
+  let queryScope = 'no-match';
+  const regionFilter = region ? ` and armRegionName eq '${region}'` : '';
+  const queryGroups = regionFilter
+    ? [
+        baseQueries.map(query => `${query}${regionFilter}`),
+        baseQueries
+      ]
+    : [baseQueries];
 
-  for (const query of queries) {
-    try {
-      const items = await fetchAllPages(`https://prices.azure.com/api/retail/prices?$filter=${encodeURIComponent(query)}&$top=100`);
-      allItems.push(...items);
-    } catch (e) {
-      console.warn('PTU query failed:', e.message);
+  for (const [groupIndex, queries] of queryGroups.entries()) {
+    const groupItems = [];
+    const groupQueries = [];
+
+    for (const query of queries) {
+      try {
+        const queryUrl = buildRetailPricesUrl(query);
+        const items = await fetchAllPages(queryUrl);
+        groupItems.push(...items);
+        groupQueries.push(queryUrl);
+      } catch (e) {
+        console.warn('PTU query failed:', e.message);
+      }
+    }
+
+    if (groupItems.length > 0) {
+      allItems = groupItems;
+      usedQueries = groupQueries;
+      queryScope = regionFilter && groupIndex === 0 ? region : 'all-regions-fallback';
+      break;
     }
   }
 
@@ -372,6 +461,9 @@ async function fetchPTUPricing(deployment) {
     dataZone: dataZone || 0,
     regional: regional || 0,
     reservations,
-    found_items: allItems.length
+    found_items: allItems.length,
+    query_urls: usedQueries,
+    query_scope: queryScope,
+    selected_deployment: deployment
   };
 }

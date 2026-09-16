@@ -17,6 +17,10 @@
 
 ## Features
 
+### Visual-first workspace
+- **Synchronized visual analysis** — scenario presets and a single control rail drive demand shape, capacity, cost, and sensitivity charts together on one page
+- **Evidence-rich supporting information** — each figure links to its equations and primary sources, with live pricing provenance, Retail Prices API calls, fallback behavior, and model limitations
+
 ### Pricing & Cost Analysis
 - **Live Azure pricing** — fetches real-time rates from the [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) with intelligent fallback
 - **5 pricing tiers compared** — PAYGO, PTU On-Demand, PTU Monthly Reserved, PTU 1-Year Reserved, and Spillover (hybrid) model
