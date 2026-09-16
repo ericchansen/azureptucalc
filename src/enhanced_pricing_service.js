@@ -203,7 +203,8 @@ class AzureOpenAIPricingService {
         source: 'live',
         timestamp: data.timestamp || new Date().toISOString(),
         strategy_used: data.strategy_used,
-        total_items: data.total_items,
+        total_items: data.total_items ?? ((data.paygo?.found_items || 0) + (data.ptu?.found_items || 0)),
+        provenance: data.provenance || null,
         raw_sample: data.raw_sample
       };
     } catch (error) {
@@ -233,7 +234,9 @@ class AzureOpenAIPricingService {
         paygo: { input: 0, output: 0 },
         ptu: { global: 1.00, dataZone: 1.10, regional: 2.00, reservations },
         source: 'fallback',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        total_items: 0,
+        provenance: null
       };
     }
 
@@ -241,7 +244,9 @@ class AzureOpenAIPricingService {
       paygo: { ...fallback.paygo },
       ptu: { ...fallback.ptu, reservations },
       source: 'fallback',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      total_items: 0,
+      provenance: null
     };
   }
 
@@ -272,4 +277,3 @@ class AzureOpenAIPricingService {
 
 // Export for use in React app
 export default AzureOpenAIPricingService;
-

@@ -45,6 +45,9 @@ import ThrottlingAdvisor from './components/ThrottlingAdvisor';
 import SpilloverComparison from './components/SpilloverComparison';
 import RetryCalculator from './components/RetryCalculator';
 import RightSizeWizard from './components/RightSizeWizard';
+import VisualCalculator from './components/VisualCalculator';
+
+const VISUAL_FIRST = true;
 
 function App() {
   // Enhanced features state
@@ -68,17 +71,17 @@ function App() {
   });
   
   // State management
-  const [selectedRegion, setSelectedRegion] = useState('eastus');
-  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [selectedRegion, setSelectedRegion] = useState('eastus2');
+  const [selectedModel, setSelectedModel] = useState('gpt-5.4');
   const [selectedDeployment, setSelectedDeployment] = useState('global');
   const [useCustomPricing, setUseCustomPricing] = useState(false);
   const [isGovernmentRegionSelected, setIsGovernmentRegionSelected] = useState(false);
   
   // KQL form data - ALL VALUES SET TO 0 EXCEPT MONTHLY MINUTES
   const [formData, setFormData] = useState({
-    avgTPM: 0,
-    p99TPM: 0,
-    maxTPM: 0,
+    avgTPM: 1000000,
+    p99TPM: 1500000,
+    maxTPM: 1800000,
     avgPTU: 0,
     p99PTU: 0,
     maxPTU: 0,
@@ -92,7 +95,7 @@ function App() {
     inputTokensMonthly: 0,
     outputTokensMonthly: 0,
     inputOutputRatio: 0.5,  // Default 50/50 split (fallback when separate TPM not provided)
-    cacheRate: 0  // Prompt cache hit rate (0-1). Reduces effective input tokens in PTU sizing.
+    cacheRate: 0.5165  // Prompt cache hit rate (0-1). Reduces effective input tokens in PTU sizing.
   });
   
   // Custom pricing data - aligned with official PTU reservation pricing
@@ -233,7 +236,7 @@ function App() {
     const hasCompletedOnboarding = localStorage.getItem('azurePTUOnboardingCompleted');
     const hasCompletedQualification = localStorage.getItem('azurePTUQualificationCompleted');
     
-    if (!hasVisited && !hasCompletedOnboarding && !hasCompletedQualification) {
+    if (!VISUAL_FIRST && !hasVisited && !hasCompletedOnboarding && !hasCompletedQualification) {
       // First-time visitor - show qualification wizard
       setShowQualificationWizard(true);
       localStorage.setItem('azurePTUCalculatorVisited', 'true');
@@ -408,7 +411,10 @@ function App() {
     ptu_monthly: 260,      // Official monthly reservation (Global)
     ptu_yearly: 2652,      // Official yearly reservation (Global)
     minPTU: 15,
-    tokensPerPTUPerMinute: 2500  // Conservative default; updated dynamically per model
+    tokensPerPTUPerMinute: 2500,  // Conservative default; updated dynamically per model
+    pricingSource: 'initial',
+    paygoPricingSource: 'initial',
+    ptuPricingSource: 'initial'
   });
   
   const [calculations, setCalculations] = useState({});
@@ -719,7 +725,13 @@ Check browser console for detailed error information.`);
         ptu_monthly: customPricing.ptu_monthly,
         ptu_yearly: customPricing.ptu_yearly,
         minPTU: 15,
-        tokensPerPTUPerMinute: getCurrentModelThroughput()
+        tokensPerPTUPerMinute: getCurrentModelThroughput(),
+        pricingSource: 'custom',
+        paygoPricingSource: 'custom',
+        ptuPricingSource: 'custom',
+        livePricingTimestamp: null,
+        pricingProvenance: null,
+        pricingItems: 0
       };
     }
     
@@ -785,6 +797,20 @@ Check browser console for detailed error information.`);
       // PRIORITY 2: Use official token pricing for PAYG (fallback from live API)
       const tokenPricing = getTokenPricing(selectedModel, selectedDeployment);
       const tokenPricingIsFallback = tokenPricing.isFallback === true;
+      const pricingResponseIsLive = livePricingData?.source === 'live';
+      let paygoPricingSource = tokenPricingIsFallback ? 'generic-fallback' : 'repository-table';
+      if (livePricingData?.source === 'fallback' && livePAYGO) {
+        paygoPricingSource = 'service-fallback';
+      } else if (pricingResponseIsLive && livePAYGO?.input > 0 && livePAYGO?.output > 0) {
+        paygoPricingSource = 'azure-api-live';
+      } else if (pricingResponseIsLive && (livePAYGO?.input > 0 || livePAYGO?.output > 0)) {
+        paygoPricingSource = 'mixed-live-static';
+      }
+      const ptuPricingSource = pricingResponseIsLive && livePTU
+        ? 'azure-api-live'
+        : livePricingData?.source === 'fallback' && livePTU
+          ? 'service-fallback'
+          : 'repository-table';
       
       // PRIORITY 3: Use per-deployment reservation rates from officialPTUPricing (which has correct rates per deployment type)
       const ptuMonthly = livePTU?.monthly || officialPTUPricing?.reservationMonthly || correctedReservations?.monthly || (officialPTUPricing?.hourly ? Math.round(officialPTUPricing.hourly * 24 * 30.4167) : 730);
@@ -803,12 +829,16 @@ Check browser console for detailed error information.`);
         officialPricing: officialPTUPricing || { source: 'corrected_pricing_data.json', model: correctedModel },
         paygoIsFallback: tokenPricingIsFallback && !livePAYGO?.input,
         pricingSource: pricingSource,
+        paygoPricingSource,
+        ptuPricingSource,
         livePricingTimestamp: livePricingData?.timestamp,
+        pricingProvenance: livePricingData?.provenance || null,
+        pricingItems: livePricingData?.total_items || 0,
         isLoadingLivePricing: isLoadingLivePricing,
         // Pricing discrepancy detection: compare live API vs hardcoded values
         // Only flag real discrepancies — ignore $0 from API (parsing failure, not real price)
         pricingDiscrepancy: (() => {
-          if (!livePAYGO || tokenPricingIsFallback) return null;
+          if (!pricingResponseIsLive || !livePAYGO || tokenPricingIsFallback) return null;
           // Skip discrepancy check if live API returned $0 (parsing failure)
           if (livePAYGO.input <= 0 && livePAYGO.output <= 0) return { hasDiscrepancy: false };
           const liveInput = livePAYGO.input > 0 ? livePAYGO.input : tokenPricing.input;
@@ -843,7 +873,14 @@ Check browser console for detailed error information.`);
         ptu_yearly: ptuYearly,
         minPTU: correctedModel?.minPTU?.[selectedDeployment] || 15,
         tokensPerPTUPerMinute: getCurrentModelThroughput(),
-        officialPricing: { source: 'fallback-corrected_pricing_data.json', model: correctedModel }
+        officialPricing: { source: 'fallback-corrected_pricing_data.json', model: correctedModel },
+        pricingSource: 'static-fallback',
+        paygoPricingSource: fallbackTokenPricing.isFallback ? 'generic-fallback' : 'repository-table',
+        ptuPricingSource: 'repository-table',
+        livePricingTimestamp: null,
+        pricingProvenance: null,
+        pricingItems: 0,
+        paygoIsFallback: true
       };
     }
   };
@@ -1472,6 +1509,28 @@ AzureMetrics
       console.error('Failed to copy KQL query:', err);
     });
   };
+
+  if (VISUAL_FIRST) {
+    return (
+      <VisualCalculator
+        formData={formData}
+        handleInputChange={handleInputChange}
+        selectedModel={selectedModel}
+        setSelectedModel={setSelectedModel}
+        selectedDeployment={selectedDeployment}
+        setSelectedDeployment={setSelectedDeployment}
+        selectedRegion={selectedRegion}
+        setSelectedRegion={setSelectedRegion}
+        currentPricing={currentPricing}
+        calculations={calculations}
+        availableModels={getAvailableModels()}
+        regions={Object.values(getRegionsByZone()).flat().map((region) => ({
+          value: region.code,
+          label: region.displayName || region.code,
+        }))}
+      />
+    );
+  }
 
   return (
     <>
