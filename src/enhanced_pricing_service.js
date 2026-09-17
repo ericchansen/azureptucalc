@@ -7,7 +7,8 @@ class AzureOpenAIPricingService {
     this.cache = new Map();
     this.cacheExpiry = 3 * 60 * 60 * 1000; // 3 hours
     this.fallbackPricing = this.loadFallbackPricing();
-    this.apiAvailable = null;
+    this.proxyDisabled = import.meta.env.VITE_DISABLE_PRICING_API === 'true';
+    this.apiAvailable = this.proxyDisabled ? false : null;
   }
 
   // Load fallback pricing data
@@ -125,10 +126,7 @@ class AzureOpenAIPricingService {
     // Try live API via Vercel serverless proxy
     let livePricing = null;
     if (this.apiAvailable !== false) {
-      try {
-        livePricing = await this.fetchFromProxy(model, region, deploymentType);
-      } catch (error) {
-      }
+      livePricing = await this.fetchFromProxy(model, region, deploymentType);
     }
 
     if (livePricing) {
@@ -137,7 +135,7 @@ class AzureOpenAIPricingService {
     }
 
     // Fallback to hardcoded pricing
-    const fallback = this.getFallbackPricing(model, deploymentType);
+    const fallback = this.getFallbackPricing(model);
     this.cache.set(cacheKey, { data: fallback, timestamp: Date.now() });
     return fallback;
   }
@@ -219,7 +217,7 @@ class AzureOpenAIPricingService {
   }
 
   // Get fallback pricing when API is unavailable
-  getFallbackPricing(model, deploymentType = 'global') {
+  getFallbackPricing(model) {
     // Official reservation prices per deployment type
     const reservations = {
       global:   { monthly: 260, yearly: 2652 },
@@ -254,14 +252,14 @@ class AzureOpenAIPricingService {
   async refreshPricing(model, region, deploymentType) {
     const cacheKey = `${model}-${region}-${deploymentType}`;
     this.cache.delete(cacheKey);
-    this.apiAvailable = null;
+    this.apiAvailable = this.proxyDisabled ? false : null;
     return this.getPricing(model, region, deploymentType);
   }
 
   // Refresh all cached pricing
   async refreshAllPricing() {
     this.cache.clear();
-    this.apiAvailable = null;
+    this.apiAvailable = this.proxyDisabled ? false : null;
     return { cleared: true, timestamp: new Date().toISOString() };
   }
 
