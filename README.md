@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/Live%20Demo-ptucalc.com-blue?style=for-the-badge" alt="Live Demo" />
+  <img src="https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-blue?style=for-the-badge" alt="Live Demo" />
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="MIT License" />
   <img src="https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/Vite-5-646CFF?style=for-the-badge&logo=vite" alt="Vite" />
@@ -11,7 +11,7 @@
 
 **Optimize your Azure OpenAI costs with intelligent PTU sizing, real-time pricing from the Azure Retail Prices API, and comprehensive cost analysis.**
 
-**Try it live at [ptucalc.com](https://www.ptucalc.com)** | **[User Guide](./docs/USER_GUIDE.md)** | **[Changelog](./CHANGELOG.md)**
+**Try it live on [GitHub Pages](https://ericchansen.github.io/azureptucalc/)** | **[User Guide](./docs/USER_GUIDE.md)** | **[Changelog](./CHANGELOG.md)**
 
 ---
 
@@ -119,7 +119,7 @@ AzureMetrics
 
 ### Local Development
 ```bash
-git clone https://github.com/ricmmartins/azureptucalc.git
+git clone https://github.com/ericchansen/azureptucalc.git
 cd azureptucalc
 npm install
 npm run dev
@@ -198,7 +198,7 @@ VITE_CACHE_DURATION=10800000
 az staticwebapp create \
   --name azureptucalc \
   --resource-group rg-azureptucalc \
-  --source https://github.com/ricmmartins/azureptucalc \
+  --source https://github.com/ericchansen/azureptucalc \
   --location "East US 2" \
   --branch main \
   --app-location "/" \
@@ -257,7 +257,7 @@ All calculations happen in your browser. No usage data is sent to external serve
 
 ## Support
 
-- [GitHub Issues](https://github.com/ricmmartins/azureptucalc/issues)
+- [GitHub Issues](https://github.com/ericchansen/azureptucalc/issues)
 - [Azure OpenAI Documentation](https://learn.microsoft.com/en-us/azure/foundry/openai/)
 - [PTU Provisioned Throughput Guide](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/provisioned-throughput)
 
@@ -278,4 +278,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ---
 
-**Made with love for the Azure community** — [ptucalc.com](https://www.ptucalc.com)
+**Made with love for the Azure community** — [GitHub Pages](https://ericchansen.github.io/azureptucalc/)
