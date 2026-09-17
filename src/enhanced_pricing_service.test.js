@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AzureOpenAIPricingService from './enhanced_pricing_service.js';
+import { isLivePricingResponse } from './pricingStatus.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -17,6 +18,8 @@ describe('AzureOpenAIPricingService static hosting', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(pricing.source).toBe('fallback');
+    expect(isLivePricingResponse(pricing)).toBe(false);
+    expect(isLivePricingResponse({ source: 'live' })).toBe(true);
     expect(service.getPricingStatus().apiAvailable).toBe(false);
   });
 });
