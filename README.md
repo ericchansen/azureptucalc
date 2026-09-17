@@ -137,6 +137,12 @@ npm run dev
 
 > The included `vercel.json` is pre-configured. The `api/azure-pricing.js` serverless function handles Azure Retail Prices API proxying to avoid CORS issues.
 
+### Deploy to GitHub Pages
+
+The included [Pages workflow](./.github/workflows/deploy-pages.yml) tests and builds the app with the repository's GitHub Pages base path, then publishes `dist` after every push to `main`.
+
+GitHub Pages only hosts static files, so it cannot run the `/api/azure-pricing` serverless proxy. The Pages build disables proxy requests and uses the calculator's bundled fallback rates instead; use the Vercel deployment when live Azure Retail Prices API data is required.
+
 ---
 
 ## Project Structure
