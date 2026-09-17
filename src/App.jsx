@@ -16,6 +16,7 @@ import ptuModels from './ptu_supported_models.json';
 import AzureOpenAIPricingService from "./enhanced_pricing_service.js";
 import enhancedModelConfig from "./enhanced_model_config.json";
 import correctedPricingData from './corrected_pricing_data.json';
+import { getPricingStatusMessage, isLivePricingResponse } from './pricingStatus.js';
 import { calculateOfficialPTUPricing, OFFICIAL_PTU_PRICING } from "./officialPTUPricing.js";
 import { getTokenPricing, calculatePAYGCost, OFFICIAL_TOKEN_PRICING, PRIORITY_PROCESSING_PRICING, PRIORITY_PROCESSING_DEPLOYMENTS } from "./official_token_pricing.js";
 import { REGION_MODEL_AVAILABILITY, getRegionsByZone, isGovernmentRegion, getGovernmentAvailableModels } from "./regionModelAvailability.js";
@@ -194,7 +195,7 @@ function App() {
             // Update pricing status based on live data availability
             setPricingStatus(prev => ({
               ...prev,
-              usingLiveData: livePricing && (livePricing.source === 'live' || livePricing.source === 'fallback'),
+              usingLiveData: isLivePricingResponse(livePricing),
               pricingSource: livePricing?.source || 'unknown',
               lastRefreshed: new Date().toLocaleString(),
               dataExpiry: livePricing && livePricing.timestamp 
@@ -619,7 +620,7 @@ Check browser console for detailed error information.`);
       setPricingStatus(prev => ({
         ...prev,
         isLoading: false,
-        usingLiveData: livePricing && (livePricing.source === 'live' || livePricing.source === 'fallback'),
+        usingLiveData: isLivePricingResponse(livePricing),
         pricingSource: livePricing?.source || 'unknown',
         lastRefreshed: new Date().toLocaleString(),
         dataExpiry: livePricing && livePricing.timestamp 
@@ -698,7 +699,8 @@ Check browser console for detailed error information.`);
         setPricingStatus(prev => ({
           ...prev,
           isLoading: false,
-          usingLiveData: true,
+          usingLiveData: isLivePricingResponse(pricing),
+          pricingSource: pricing?.source || 'unknown',
           lastRefreshed: new Date().toLocaleString()
         }));
       } catch (error) {
@@ -1385,7 +1387,8 @@ Check browser console for detailed error information.`);
       setPricingStatus(prev => ({
         ...prev,
         isLoading: false,
-        usingLiveData: true,
+        usingLiveData: pricing.pricingSource === 'azure-api-live',
+        pricingSource: pricing.pricingSource,
         lastRefreshed: new Date().toLocaleString()
       }));
     }, 1500);
@@ -1677,9 +1680,9 @@ AzureMetrics
                 } else if (isLive && isPartial) {
                   return "Partial Azure API pricing data available - some models may use fallback pricing";
                 } else if (isSimulated) {
-                  return "Static pricing data with periodic API validation";
+                  return "Simulated pricing data for local development";
                 } else {
-                  return "Static pricing data with periodic API validation";
+                  return "Static pricing data from bundled repository rates";
                 }
               })()}
             </CardDescription>
@@ -1712,10 +1715,7 @@ AzureMetrics
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <span className="text-sm">
-                  {pricingStatus.usingLiveData 
-                    ? "Live pricing data from Azure API (prices.azure.com/api/retail/prices)" 
-                    : "Static pricing data with periodic API validation"
-                  }
+                  {getPricingStatusMessage(livePricingData?.source)}
                 </span>
               </div>
               

@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { RotateCcw } from 'lucide-react';
 import enhancedModelConfig from '../enhanced_model_config.json';
+import { getPricingSourceLabel } from '../pricingStatus.js';
 
 const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 0,
@@ -75,18 +76,6 @@ const DEPLOYMENT_LABELS = {
   dataZone: 'Data Zone',
   regional: 'Regional',
 };
-const PRICING_SOURCE_LABELS = {
-  'azure-api-live': 'Live Azure Retail Prices API',
-  'service-fallback': 'Repository fallback after an API miss',
-  'static-fallback': 'Repository fallback after a pricing error',
-  'mixed-live-static': 'Mixed live and repository rates',
-  'repository-table': 'Repository pricing table',
-  'generic-fallback': 'Generic fallback rate',
-  custom: 'Custom pricing values',
-  initial: 'Initial repository defaults',
-  static: 'Repository pricing tables',
-};
-
 const DECK_DEFAULTS = {
   rpm: 40,
   cache: 50,
@@ -237,9 +226,9 @@ const VisualCalculator = ({
   const ptuIncrement = Number(deploymentConfig.increment || 5);
   const selectedPriceOption = PTU_PRICE_OPTIONS.find(({ value }) => value === ptuPriceOption) || PTU_PRICE_OPTIONS[0];
   const selectedRegionLabel = regions.find((region) => (region.value || region) === selectedRegion)?.label || selectedRegion;
-  const pricingSourceLabel = PRICING_SOURCE_LABELS[currentPricing?.pricingSource] || 'Repository pricing tables';
-  const paygoSourceLabel = PRICING_SOURCE_LABELS[currentPricing?.paygoPricingSource] || pricingSourceLabel;
-  const ptuSourceLabel = PRICING_SOURCE_LABELS[currentPricing?.ptuPricingSource] || pricingSourceLabel;
+  const pricingSourceLabel = getPricingSourceLabel(currentPricing?.pricingSource);
+  const paygoSourceLabel = getPricingSourceLabel(currentPricing?.paygoPricingSource, pricingSourceLabel);
+  const ptuSourceLabel = getPricingSourceLabel(currentPricing?.ptuPricingSource, pricingSourceLabel);
   const pricingTimestamp = formatDateTime(currentPricing?.livePricingTimestamp);
   const proxyRequest = `/api/azure-pricing?model=${encodeURIComponent(selectedModel)}&region=${encodeURIComponent(selectedRegion)}&deployment=${encodeURIComponent(selectedDeployment)}`;
 
