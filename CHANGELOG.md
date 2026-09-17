@@ -302,7 +302,7 @@ All notable changes to the Microsoft Foundry PTU Calculator are documented in th
 
 ## Links
 
-- **Live App:** [ptucalc.com](https://www.ptucalc.com)
-- **Source:** [github.com/ricmmartins/azureptucalc](https://github.com/ricmmartins/azureptucalc)
+- **Live App:** [GitHub Pages](https://ericchansen.github.io/azureptucalc/)
+- **Source:** [github.com/ericchansen/azureptucalc](https://github.com/ericchansen/azureptucalc)
 - **User Guide:** [docs/USER_GUIDE.md](./docs/USER_GUIDE.md)
-- **Issues:** [GitHub Issues](https://github.com/ricmmartins/azureptucalc/issues)
+- **Issues:** [GitHub Issues](https://github.com/ericchansen/azureptucalc/issues)

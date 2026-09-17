@@ -18,11 +18,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ricmmartins/azureptucalc.git"
+    "url": "https://github.com/ericchansen/azureptucalc.git"
   },
-  "homepage": "https://github.com/ricmmartins/azureptucalc#readme",
+  "homepage": "https://ericchansen.github.io/azureptucalc/",
   "bugs": {
-    "url": "https://github.com/ricmmartins/azureptucalc/issues"
+    "url": "https://github.com/ericchansen/azureptucalc/issues"
   },
   "scripts": {
     "dev": "vite",

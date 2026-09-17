@@ -2,5 +2,5 @@
 
 Visual calculator for comparing Microsoft Foundry provisioned throughput and PAYGO economics across workload intensity, cached-input share, and weekly demand patterns.
 
-- [Open the calculator](https://www.ptucalc.com/)
+- [Open the calculator](https://ericchansen.github.io/azureptucalc/)
 - [Microsoft Foundry pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/)

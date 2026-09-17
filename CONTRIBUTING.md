@@ -13,7 +13,7 @@ By contributing, you agree to the terms of the MIT license. See [LICENSE](LICENS
 ## How to Contribute
 
 ### Reporting Issues
-- Use the [GitHub Issues](https://github.com/ricmmartins/azureptucalc/issues) page
+- Use the [GitHub Issues](https://github.com/ericchansen/azureptucalc/issues) page
 - Search existing issues before creating a new one
 - Provide detailed information including:
   - Steps to reproduce
@@ -22,7 +22,7 @@ By contributing, you agree to the terms of the MIT license. See [LICENSE](LICENS
   - Screenshots if applicable
 
 ### Suggesting Features
-- Open a [GitHub Discussion](https://github.com/ricmmartins/azureptucalc/discussions)
+- Open a [GitHub Discussion](https://github.com/ericchansen/azureptucalc/discussions)
 - Describe the feature and its use case
 - Explain how it would benefit users
 
@@ -31,7 +31,7 @@ By contributing, you agree to the terms of the MIT license. See [LICENSE](LICENS
 #### Development Setup
 ```bash
 # Fork and clone the repository
-git clone https://github.com/ricmmartins/azureptucalc.git
+git clone https://github.com/ericchansen/azureptucalc.git
 cd azureptucalc
 
 # Install dependencies

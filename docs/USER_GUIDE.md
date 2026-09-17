@@ -2,9 +2,11 @@
 
 ## What is the Microsoft Foundry PTU Calculator?
 
-The Microsoft Foundry PTU Calculator is a free, open-source tool that helps you optimize your Azure OpenAI costs by comparing PAYGO, PTU reservations, spillover (hybrid), and Priority Processing pricing. It supports 14 current PTU models, 3 deployment types, and fetches live pricing from the Azure Retail Prices API.
+The Microsoft Foundry PTU Calculator is a free, open-source tool that helps you optimize your Azure OpenAI costs by comparing PAYGO, PTU reservations, spillover (hybrid), and Priority Processing pricing. It supports 14 current PTU models, 3 deployment types, and can fetch live pricing from the Azure Retail Prices API when deployed with the serverless pricing proxy.
 
-Try it live at [ptucalc.com](https://www.ptucalc.com)
+Try it live on [GitHub Pages](https://ericchansen.github.io/azureptucalc/)
+
+The GitHub Pages deployment uses bundled fallback rates because static hosting cannot run the pricing proxy. Use the Vercel deployment when you require live Azure Retail Prices API data.
 
 ---
 
@@ -239,9 +241,9 @@ AzureMetrics
 
 ## Need Help?
 
-- [Open an issue on GitHub](https://github.com/ricmmartins/azureptucalc/issues)
-- [GitHub Discussions](https://github.com/ricmmartins/azureptucalc/discussions)
+- [Open an issue on GitHub](https://github.com/ericchansen/azureptucalc/issues)
+- [GitHub Discussions](https://github.com/ericchansen/azureptucalc/discussions)
 
 ---
 
-**Made with love for the Azure community** - [ptucalc.com](https://www.ptucalc.com)
+**Made with love for the Azure community** - [GitHub Pages](https://ericchansen.github.io/azureptucalc/)
